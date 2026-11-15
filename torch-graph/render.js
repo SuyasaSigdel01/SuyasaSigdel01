@@ -18,7 +18,7 @@ const width = PAD_LEFT + gridW + PAD_RIGHT;
 const height = PAD_TOP + gridH + PAD_BOTTOM;
 
 /* ---------- sprite ---------- */
-const PX = 2;
+const PX = 4;
 const PALETTE = {
     O: '#6b705c',
     H: '#3b2a1d',
@@ -118,7 +118,7 @@ function pixels(rows, yOffset = 0) {
 
 const girl = `
   <g id="girl" transform="translate(${startX}, ${girlY})">
-    <circle cx="${TORCH_DX + PX / 2}" cy="-26" r="52" fill="url(#glow)"/>
+    <circle cx="${TORCH_DX + PX / 2}" cy="-24" r="44" fill="url(#glow)"/>
     <g class="bob">
       <g class="flame">
         <rect x="${TORCH_DX}" y="0" width="${PX}" height="${PX}" fill="#ffd166"/>
@@ -134,7 +134,7 @@ const girl = `
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <defs>
     <radialGradient id="glow">
-      <stop offset="0%" stop-color="#ffb703" stop-opacity="0.30"/>
+      <stop offset="0%" stop-color="#ffb703" stop-opacity="0.22"/>
       <stop offset="60%" stop-color="#ffb703" stop-opacity="0.08"/>
       <stop offset="100%" stop-color="#ffb703" stop-opacity="0"/>
     </radialGradient>
