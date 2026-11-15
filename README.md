@@ -14,5 +14,4 @@ Here are some ideas to get you started:
 - ðŸ˜„ Pronouns: ...
 - âš¡ Fun fact: ...
 -->
-![](./torch-graph/graph.svg)
-
+![](./torch-graph/graph.svg?v=5)
