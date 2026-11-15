@@ -4,6 +4,10 @@ I'm **Suyasa Sigdel**, a final-year **Computer Engineering** student at Kathmand
 
 I build with **Python and computer vision** — gesture control, pose tracking, and AI projects aimed at problems that actually need solving.
 
+- Currently working on a Nepali document extractor (OCR + LLM → structured fields)
+- Learning deep learning and model deployment
+- Ask me about Python, PyTorch, and NLP for low-resource languages
+- Reach me at sigdelsuyasa01@gmail.com · [LinkedIn](https://www.linkedin.com/in/suyasa-sigdel-719627430/)
 ### Skills
 
 **Languages**
