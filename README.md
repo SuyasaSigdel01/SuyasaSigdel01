@@ -1,6 +1,10 @@
 ﻿# Hi there 👋
 
-### 🛠️ Skills
+I'm **Suyasa Sigdel**, a final-year **Computer Engineering** student at Kathmandu Engineering College, Tribhuvan University.
+
+I build with **Python and computer vision** — gesture control, pose tracking, and AI projects aimed at problems that actually need solving.
+
+### Skills
 
 **Languages**
 
