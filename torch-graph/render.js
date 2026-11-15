@@ -6,95 +6,131 @@ const cal = JSON.parse(readFileSync('contributions.json', 'utf8'));
 const CELL = 11,
     GAP = 3,
     PITCH = CELL + GAP;
-const CAVE_W = 64,
-    CAVE_H = 74;
-const PAD_LEFT = CAVE_W + 8,
-    PAD_TOP = 30,
-    PAD_BOTTOM = 34,
+const PAD_LEFT = 12,
+    PAD_TOP = 46,
+    PAD_BOTTOM = 28,
     PAD_RIGHT = 12;
 
 const weeks = cal.weeks;
-const gridW = weeks.length * PITCH - GAP;
+const COLS = weeks.length;
+const gridW = COLS * PITCH - GAP;
 const gridH = 7 * PITCH - GAP;
 const width = PAD_LEFT + gridW + PAD_RIGHT;
 const height = PAD_TOP + gridH + PAD_BOTTOM;
 
-/* ---------- sprite ---------- */
-const PX = 3;
+const RIDE = 24; // one lap of the grid
+const CYCLE = RIDE * 2; // lap 1 delivers, lap 2 collects
+const TRAIL_CELLS = 4;
+const FADE_CELLS = 1.5;
+const RIBBON = '#ffd166';
+const DARK = '#161b22';
+
+function rand(i) {
+    const s = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+    return s - Math.floor(s);
+}
+
+/* ---------- trees ---------- */
+const NEEDLE_DARK = '#1f6b3a',
+    NEEDLE_LIGHT = '#2d8a4e',
+    TRUNK = '#5a3b25';
+
+function treeUp(x, baseY, h) {
+    const w = h * 0.62;
+    return `  <g>
+    <rect x="${(x - 1).toFixed(1)}" y="${(baseY - 3).toFixed(1)}" width="2" height="4" fill="${TRUNK}"/>
+    <polygon points="${x.toFixed(1)},${(baseY - h).toFixed(1)} ${(x - w / 2).toFixed(1)},${(baseY - 2).toFixed(1)} ${(x + w / 2).toFixed(1)},${(baseY - 2).toFixed(1)}" fill="${NEEDLE_DARK}"/>
+    <polygon points="${x.toFixed(1)},${(baseY - h).toFixed(1)} ${(x - w / 3.2).toFixed(1)},${(baseY - h * 0.45).toFixed(1)} ${(x + w / 3.2).toFixed(1)},${(baseY - h * 0.45).toFixed(1)}" fill="${NEEDLE_LIGHT}"/>
+    <circle cx="${x.toFixed(1)}" cy="${(baseY - h - 1).toFixed(1)}" r="1.3" fill="${RIBBON}"/>
+  </g>\n`;
+}
+
+function treeDown(x, topY, h) {
+    const w = h * 0.62;
+    return `  <g>
+    <rect x="${(x - 1).toFixed(1)}" y="${topY.toFixed(1)}" width="2" height="4" fill="${TRUNK}"/>
+    <polygon points="${x.toFixed(1)},${(topY + h).toFixed(1)} ${(x - w / 2).toFixed(1)},${(topY + 2).toFixed(1)} ${(x + w / 2).toFixed(1)},${(topY + 2).toFixed(1)}" fill="${NEEDLE_DARK}"/>
+    <polygon points="${x.toFixed(1)},${(topY + h).toFixed(1)} ${(x - w / 3.2).toFixed(1)},${(topY + h * 0.55).toFixed(1)} ${(x + w / 3.2).toFixed(1)},${(topY + h * 0.55).toFixed(1)}" fill="${NEEDLE_LIGHT}"/>
+    <circle cx="${x.toFixed(1)}" cy="${(topY + h + 1).toFixed(1)}" r="1.3" fill="${RIBBON}"/>
+  </g>\n`;
+}
+
+let hanging = '';
+for (let i = 0; i < 13; i++) {
+    hanging += treeDown(30 + i * ((width - 60) / 12) + (rand(i + 60) - 0.5) * 18, 0, 14 + rand(i + 120) * 12);
+}
+let forest = '';
+for (let i = 0; i < 18; i++) {
+    forest += treeUp(20 + i * ((width - 40) / 17) + (rand(i + 200) - 0.5) * 14, height - 4, 10 + rand(i + 260) * 11);
+}
+
+/* ---------- santa sprite ---------- */
+const PX = 2;
 const PALETTE = {
-    O: '#000000',
-    H: '#3b2a1d',
+    R: '#d62828',
     F: '#f3cfa9',
-    E: '#2a1a10',
-    C: '#e8799e',
-    B: '#b8537a',
-    L: '#5a4632',
-    S: '#2f2418',
-    T: '#6b4a2a',
+    W: '#ffffff',
+    S: '#a0522d',
+    U: '#ffd166',
+    D: '#a9682f',
+    K: '#6b4423',
+    A: '#8a6a4a',
+    N: '#2b1b12',
+    E: '#1a1008',
+    T: '#5a4632',
 };
 const BODY = [
-    '..OOOO..',
-    '.OOOOOO.',
-    '.HFFFFHT',
-    '.HFEEFHT',
-    '.HFFFFHT',
-    '.CCCCCCT',
-    '.CCCCCC.',
-    '.CBBBBC.',
-    '..LLLL..',
+    '.................A.A',
+    '..................AA',
+    '...RRR...........DDD',
+    '..RRRRR..........DED',
+    '...FFF...........DDN',
+    '..WWWWW......DDDDDD.',
+    '..RRRRRTTTTTDDDDDDD.',
+    'SSSSSSSS....DD...DD.',
+    'S......S............',
+    'SUUUUUUS............',
+    '.UUUUUU.............',
 ];
-const LEGS_A = ['..L..L..', '.S....S.'];
-const LEGS_B = ['...LL...', '..S..S..'];
+const LEGS_A = ['............K.K..K.K', '............K.K..K.K', '............K.K..K.K'];
+const LEGS_B = ['...........K.K..K.K.', '...........K.K..K.K.', '...........K.K..K.K.'];
+const SW = 20 * PX,
+    SH = BODY.length * PX;
 
-const SPRITE_W = 8 * PX;
-const SPRITE_H = (BODY.length + 2) * PX;
-const TORCH_DX = 7 * PX;
-
-/* ---------- journey ---------- */
-const DURATION = 22;
-const HOLD_OUT = 8;
-const EMERGE_END = 16;
-const OUT_END = 55;
-const TURN_END = 59;
-const RETURN_END = 88;
-const BACK_END = 96;
-
-const girlY = PAD_TOP + gridH - SPRITE_H + 14;
-const BASE = girlY + SPRITE_H;
-const caveX = 24; // centred in the black mouth (14..58)
-const EMERGE_X = caveX + 80;
-const turnX = PAD_LEFT + gridW - SPRITE_W + 6;
-
-function arrival(cx) {
-    const gx = cx + CELL / 2 - TORCH_DX;
-    let pct;
-    if (gx <= EMERGE_X) {
-        const f = Math.min(1, Math.max(0, (gx - caveX) / (EMERGE_X - caveX)));
-        pct = HOLD_OUT + (EMERGE_END - HOLD_OUT) * f;
-    } else {
-        const f = Math.min(1, Math.max(0, (gx - EMERGE_X) / (turnX - EMERGE_X)));
-        pct = EMERGE_END + (OUT_END - EMERGE_END) * f;
+/* ---------- serpentine path ---------- */
+const path = [];
+for (let r = 0; r < 7; r++) {
+    for (let k = 0; k < COLS; k++) {
+        path.push({ col: r % 2 === 0 ? k : COLS - 1 - k, row: r });
     }
-    return DURATION * pct / 100;
 }
+const STEPS = path.length;
+const visitAt = new Map();
+path.forEach((p, i) => visitAt.set(`${p.col},${p.row}`, (i / (STEPS - 1)) * RIDE));
+
+const stepT = RIDE / (STEPS - 1);
+const P_WHITE = (((TRAIL_CELLS * stepT) / CYCLE) * 100).toFixed(3);
+const P_SETTLED = ((((TRAIL_CELLS + FADE_CELLS) * stepT) / CYCLE) * 100).toFixed(3);
+const H_WHITE = (50 + Number(P_WHITE)).toFixed(3);
+const H_SETTLED = (50 + Number(P_SETTLED)).toFixed(3);
 
 /* ---------- cells ---------- */
 const COLORS = {
-    NONE: '#161b22',
     FIRST_QUARTILE: '#0e4429',
     SECOND_QUARTILE: '#006d32',
     THIRD_QUARTILE: '#26a641',
     FOURTH_QUARTILE: '#39d353',
 };
 const LEVEL_CLASS = {
-    FIRST_QUARTILE: 'l1',
-    SECOND_QUARTILE: 'l2',
-    THIRD_QUARTILE: 'l3',
-    FOURTH_QUARTILE: 'l4',
+    FIRST_QUARTILE: 't1',
+    SECOND_QUARTILE: 't2',
+    THIRD_QUARTILE: 't3',
+    FOURTH_QUARTILE: 't4',
 };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 let cells = '',
+    gifts = '',
     labels = '',
     lastMonth = -1;
 
@@ -107,16 +143,42 @@ weeks.forEach((week, x) => {
             lastMonth = m;
         }
     }
+
     for (const day of week.contributionDays) {
         const cx = PAD_LEFT + x * PITCH;
         const cy = PAD_TOP + day.weekday * PITCH;
         const cls = LEVEL_CLASS[day.contributionLevel];
-        const anim = cls ? ` class="${cls}" style="animation-delay:${arrival(cx).toFixed(2)}s"` : '';
-        cells += `  <rect x="${cx}" y="${cy}" width="${CELL}" height="${CELL}" rx="2" fill="${COLORS[day.contributionLevel]}"${anim}/>\n`;
+        const t = visitAt.get(`${x},${day.weekday}`).toFixed(2);
+
+        cells += `  <rect x="${cx}" y="${cy}" width="${CELL}" height="${CELL}" rx="2" fill="${DARK}" class="${cls || 'tn'}" style="animation-delay:${t}s"/>\n`;
+
+        if (cls) {
+            gifts += `  <g class="gw" style="animation-delay:${t}s">` +
+                `<rect x="${cx + 4.5}" y="${cy}" width="2" height="${CELL}" fill="${RIBBON}"/>` +
+                `<rect x="${cx}" y="${cy + 4.5}" width="${CELL}" height="2" fill="${RIBBON}"/>` +
+                `<circle cx="${cx + 3.6}" cy="${cy + 1.4}" r="1.5" fill="${RIBBON}"/>` +
+                `<circle cx="${cx + 7.4}" cy="${cy + 1.4}" r="1.5" fill="${RIBBON}"/>` +
+                `</g>\n`;
+        }
     }
 });
 
-/* ---------- girl ---------- */
+/* ---------- ride keyframes ---------- */
+let rideKeys = '';
+path.forEach((p, i) => {
+    const sx = PAD_LEFT + p.col * PITCH + CELL / 2 - SW / 2;
+    const sy = PAD_TOP + p.row * PITCH + CELL / 2 - SH / 2;
+    rideKeys += `      ${((i / (STEPS - 1)) * 100).toFixed(4)}% { transform: translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) }\n`;
+});
+
+let faceKeys = '';
+for (let r = 0; r < 7; r++) {
+    const a = (r * 100) / 7;
+    const b = r === 6 ? 100 : ((r + 1) * 100) / 7 - 0.001;
+    const t = r % 2 === 0 ? 'translateX(0) scaleX(1)' : `translateX(${SW}px) scaleX(-1)`;
+    faceKeys += `      ${a.toFixed(3)}%, ${b.toFixed(3)}% { transform: ${t} }\n`;
+}
+
 function pixels(rows, yOffset = 0) {
     let out = '';
     rows.forEach((row, y) => {
@@ -129,102 +191,116 @@ function pixels(rows, yOffset = 0) {
     return out;
 }
 
-const girl = `
-  <g id="girl" transform="translate(${caveX}, ${girlY})">
+const santa = `
+  <g id="santa">
     <g class="facing">
-      <g class="torchlight">
-        <circle cx="${TORCH_DX + PX / 2}" cy="-24" r="40" fill="url(#glow)"/>
-        <g class="flame">
-          <rect x="${TORCH_DX}" y="0" width="${PX}" height="${PX}" fill="#ffd166"/>
-          <rect x="${TORCH_DX}" y="${PX}" width="${PX}" height="${PX}" fill="#ff8c42"/>
-        </g>
-      </g>
       <g class="bob">
         ${pixels(BODY)}
-        <g class="legsA">${pixels(LEGS_A, BODY.length)}</g>
-        <g class="legsB">${pixels(LEGS_B, BODY.length)}</g>
+        <g class="legsA">${pixels(LEGS_A, 8)}</g>
+        <g class="legsB">${pixels(LEGS_B, 8)}</g>
       </g>
     </g>
   </g>`;
 
-/* ---------- cave, split front and back ---------- */
-// rock goes BEHIND her
-const caveRock = `
-  <g id="cave-rock">
-    <path d="M0 ${BASE} L0 ${BASE - 42} Q4 ${BASE - 70} 32 ${BASE - CAVE_H} Q60 ${BASE - 70} ${CAVE_W} ${BASE - 42} L${CAVE_W} ${BASE} Z" fill="#4a3a2a"/>
-    <path d="M0 ${BASE - 42} Q4 ${BASE - 70} 32 ${BASE - CAVE_H}" fill="none" stroke="#6e5742" stroke-width="2"/>
-  </g>`;
-
-// black mouth goes IN FRONT — the only thing that hides her
-const caveMouth = `
-  <path id="cave-mouth" d="M14 ${BASE} L14 ${BASE - 34} Q36 ${BASE - 64} 58 ${BASE - 34} L58 ${BASE} Z" fill="#000000"/>`;
-
-const ground = `<rect x="0" y="${BASE}" width="${width}" height="1.5" fill="#1f262e"/>`;
+/* ---------- ambient snowfall ---------- */
+let ambient = '';
+for (let i = 0; i < 80; i++) {
+    const ax = (rand(i + 500) * width).toFixed(1);
+    const dur = (4 + rand(i + 900) * 5).toFixed(2);
+    const del = (rand(i + 1300) * 9).toFixed(2);
+    const sz = rand(i + 1700) < 0.3 ? 2.5 : 1.8;
+    ambient += `  <rect class="amb" x="${ax}" y="-8" width="${sz}" height="${sz}" rx="${sz / 2}" fill="#ffffff" style="animation-duration:${dur}s;animation-delay:${del}s"/>\n`;
+}
 
 /* ---------- assemble ---------- */
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <defs>
-    <radialGradient id="glow">
-      <stop offset="0%" stop-color="#ffb703" stop-opacity="0.22"/>
-      <stop offset="60%" stop-color="#ffb703" stop-opacity="0.07"/>
-      <stop offset="100%" stop-color="#ffb703" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
   <style>
     .m { fill: #7d8590; font: 9px -apple-system, "Segoe UI", sans-serif; }
 
-    .l1, .l2, .l3, .l4 {
-      animation-duration: 1.4s;
-      animation-timing-function: ease-out;
-      animation-fill-mode: both;
+    .t1, .t2, .t3, .t4, .tn {
+      animation-duration: ${CYCLE}s;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
     }
-    .l1 { animation-name: lit1 } .l2 { animation-name: lit2 }
-    .l3 { animation-name: lit3 } .l4 { animation-name: lit4 }
-    @keyframes lit1 { 0% { fill:#161b22 } 20% { fill:#ffd166 } 100% { fill:#0e4429 } }
-    @keyframes lit2 { 0% { fill:#161b22 } 20% { fill:#ffd166 } 100% { fill:#006d32 } }
-    @keyframes lit3 { 0% { fill:#161b22 } 20% { fill:#ffd166 } 100% { fill:#26a641 } }
-    @keyframes lit4 { 0% { fill:#161b22 } 20% { fill:#ffd166 } 100% { fill:#39d353 } }
+    .t1 { animation-name: tr1 } .t2 { animation-name: tr2 }
+    .t3 { animation-name: tr3 } .t4 { animation-name: tr4 }
+    .tn { animation-name: trn }
 
-    #girl { animation: walk ${DURATION}s linear forwards }
-    @keyframes walk {
-      0%, ${HOLD_OUT}%     { transform: translate(${caveX}px, ${girlY}px) }
-      ${EMERGE_END}%       { transform: translate(${EMERGE_X}px, ${girlY}px) }
-      ${OUT_END}%          { transform: translate(${turnX}px, ${girlY}px) }
-      ${TURN_END}%         { transform: translate(${turnX}px, ${girlY}px) }
-      ${RETURN_END}%       { transform: translate(${EMERGE_X}px, ${girlY}px) }
-      ${BACK_END}%, 100%   { transform: translate(${caveX}px, ${girlY}px) }
+    @keyframes tr1 {
+      0%, ${P_WHITE}%        { fill:#ffffff }
+      ${P_SETTLED}%, 49.999% { fill:${COLORS.FIRST_QUARTILE} }
+      50%, ${H_WHITE}%       { fill:#ffffff }
+      ${H_SETTLED}%, 100%    { fill:${DARK} }
+    }
+    @keyframes tr2 {
+      0%, ${P_WHITE}%        { fill:#ffffff }
+      ${P_SETTLED}%, 49.999% { fill:${COLORS.SECOND_QUARTILE} }
+      50%, ${H_WHITE}%       { fill:#ffffff }
+      ${H_SETTLED}%, 100%    { fill:${DARK} }
+    }
+    @keyframes tr3 {
+      0%, ${P_WHITE}%        { fill:#ffffff }
+      ${P_SETTLED}%, 49.999% { fill:${COLORS.THIRD_QUARTILE} }
+      50%, ${H_WHITE}%       { fill:#ffffff }
+      ${H_SETTLED}%, 100%    { fill:${DARK} }
+    }
+    @keyframes tr4 {
+      0%, ${P_WHITE}%        { fill:#ffffff }
+      ${P_SETTLED}%, 49.999% { fill:${COLORS.FOURTH_QUARTILE} }
+      50%, ${H_WHITE}%       { fill:#ffffff }
+      ${H_SETTLED}%, 100%    { fill:${DARK} }
+    }
+    @keyframes trn {
+      0%, ${P_WHITE}%        { fill:#ffffff }
+      ${P_SETTLED}%, 49.999% { fill:${DARK} }
+      50%, ${H_WHITE}%       { fill:#ffffff }
+      ${H_SETTLED}%, 100%    { fill:${DARK} }
     }
 
-    .facing { animation: face ${DURATION}s linear forwards }
+    .gw {
+      opacity: 0;
+      animation-name: wrap;
+      animation-duration: ${CYCLE}s;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+    @keyframes wrap {
+      0%, ${P_WHITE}%            { opacity: 0 }
+      ${P_SETTLED}%, ${H_WHITE}% { opacity: 1 }
+      ${H_SETTLED}%, 100%        { opacity: 0 }
+    }
+
+    #santa { animation: ride ${RIDE}s linear infinite }
+    @keyframes ride {
+${rideKeys}    }
+
+    .facing { animation: face ${RIDE}s linear infinite }
     @keyframes face {
-      0%, 56.9%   { transform: translateX(0) scaleX(1) }
-      57%, 100%   { transform: translateX(${SPRITE_W}px) scaleX(-1) }
-    }
+${faceKeys}    }
 
-    .torchlight { animation: torch ${DURATION}s linear forwards }
-    @keyframes torch {
-      0%, 9%      { opacity: 0 }
-      13%, 56.9%  { opacity: 1 }
-      57%, 100%   { opacity: 0 }
-    }
-
-    .legsA { animation: strideA 0.34s steps(1) infinite }
-    .legsB { animation: strideB 0.34s steps(1) infinite }
+    .legsA { animation: strideA 0.2s steps(1) infinite }
+    .legsB { animation: strideB 0.2s steps(1) infinite }
     @keyframes strideA { 0%, 49% { opacity:1 } 50%, 100% { opacity:0 } }
     @keyframes strideB { 0%, 49% { opacity:0 } 50%, 100% { opacity:1 } }
 
-    .bob { animation: bob 0.34s steps(1) infinite }
+    .bob { animation: bob 0.2s steps(1) infinite }
     @keyframes bob { 0%, 49% { transform: translateY(0) } 50%, 100% { transform: translateY(1px) } }
 
-    .flame { animation: flick 0.22s steps(1) infinite }
-    @keyframes flick { 0% { opacity:1 } 50% { opacity:0.55 } 100% { opacity:1 } }
+    .amb {
+      animation-name: ambient;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+      opacity: 0;
+    }
+    @keyframes ambient {
+      0%   { transform: translateY(0); opacity: 0 }
+      10%  { opacity: 0.4 }
+      88%  { opacity: 0.4 }
+      100% { transform: translateY(${height + 20}px); opacity: 0 }
+    }
   </style>
   <rect width="100%" height="100%" fill="#0d1117"/>
-${labels}${cells}  ${ground}
-  ${caveRock}
-${girl}
-  ${caveMouth}
-</svg>`;
+${hanging}${labels}${cells}${gifts}${forest}${santa}${ambient}</svg>`;
 
 writeFileSync('graph.svg', svg);
-console.log(`wrote graph.svg  ${width}x${height}  (round trip ${DURATION}s)`);
+console.log(`wrote graph.svg  ${width}x${height}  (${STEPS} steps, cycle ${CYCLE}s)`);
